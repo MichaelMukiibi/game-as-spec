@@ -54,21 +54,27 @@ def read_world_spec():
         return ""
 
 async def watch_file_changes():
-    """Watches world.jsonl and streams deltas to all connected web interfaces."""
-    print("[Watcher] Tracking changes on 'public/world.jsonl'...")
-    async for changes in awatch("public/world.jsonl"):
-        if not connected_clients:
-            continue
+    """Watches the public directory and streams deltas to all connected web interfaces."""
+    print("[Watcher] Tracking changes on 'public/' directory...")
+    async for changes in awatch("public"):
+        for change_type, file_path in changes:
+            #Check if modified file is the world spec
+            if file_path.endswith("world.jsonl"):
+                print(f"[Watcher] Change detected in world.jsonl ({change_type}). Broadcasting to engine...")
+                
+            if not connected_clients:
+                print("[Watcher] No active browser windows open. Skipping broadcast.")
+                continue
+                
+            print("[Watcher] Configuration update detected! Streaming changes...")
+            updated_state = read_world_spec()
             
-        print("[Watcher] Configuration update detected! Streaming changes...")
-        updated_state = read_world_spec()
-        
-        # Broadcast the updated stream to all running engine instances
-        for client in list(connected_clients):
-            try:
-                await client.send_text(updated_state)
-            except Exception:
-                connected_clients.remove(client)
+            # Broadcast the updated stream to all running engine instances
+            for client in list(connected_clients):
+                try:
+                    await client.send_text(updated_state)
+                except Exception:
+                    connected_clients.remove(client)
 
 @app.on_event("startup")
 async def startup_event():

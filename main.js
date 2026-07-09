@@ -101,6 +101,8 @@ function animate() {
     renderer.render(scene, camera);
 }
 
+
+
 // Boot up the declarative ecosystem 
 loadWorldSpecification();
 animate();
