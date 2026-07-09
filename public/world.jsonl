@@ -1,3 +1,5 @@
-{"type": "entity", "id": "center_beacon", "mesh": "cylinder", "color": "0x00ffff", "position": {"x": 0, "y": 1, "z": 0}, "scale": {"x": 1, "y": 2, "z": 1}, "behavior": "spin", "behaviorSpeed": 2.0}
-{"type": "entity", "id": "bouncing_ball", "mesh": "sphere", "color": "0xff00ff", "position": {"x": -3, "y": 0, "z": 1}, "scale": {"x": 1.5, "y": 1.5, "z": 1.5}, "behavior": "bounce", "behaviorSpeed": 3.5, "behaviorAmplitude": 2.0}
-{"type": "entity", "id": "orbiting_ring", "mesh": "torus", "color": "0xffff00", "position": {"x": 0, "y": 1, "z": 0}, "scale": {"x": 1, "y": 1, "z": 1}, "behavior": "orbit", "behaviorSpeed": 1.5, "behaviorRadius": 4.5}
+{"type": "entity", "id": "central_pillar", "mesh": "cylinder", "color": "0x6a0dad", "position": {"x": 0.0, "y": 1.0, "z": 0.0}, "scale": {"x": 2.0, "y": 4.0, "z": 2.0}}
+{"type": "entity", "id": "orbit_box_1", "mesh": "box", "color": "0xffa500", "position": {"x": 0.0, "y": 1.0, "z": 0.0}, "scale": {"x": 0.5, "y": 0.5, "z": 0.5}, "behavior": "orbit", "behaviorSpeed": 1.0, "behaviorRadius": 3.0}
+{"type": "entity", "id": "orbit_box_2", "mesh": "box", "color": "0xffa500", "position": {"x": 0.0, "y": 1.0, "z": 0.0}, "scale": {"x": 0.5, "y": 0.5, "z": 0.5}, "behavior": "orbit", "behaviorSpeed": 1.2, "behaviorRadius": 3.0}
+{"type": "entity", "id": "orbit_box_3", "mesh": "box", "color": "0xffa500", "position": {"x": 0.0, "y": 1.0, "z": 0.0}, "scale": {"x": 0.5, "y": 0.5, "z": 0.5}, "behavior": "orbit", "behaviorSpeed": 0.8, "behaviorRadius": 3.0}
+{"type": "entity", "id": "orbit_box_4", "mesh": "box", "color": "0xffa500", "position": {"x": 0.0, "y": 1.0, "z": 0.0}, "scale": {"x": 0.5, "y": 0.5, "z": 0.5}, "behavior": "orbit", "behaviorSpeed": 1.1, "behaviorRadius": 3.0}
