@@ -2,6 +2,7 @@
 # dependencies = [
 #     "fastapi",
 #     "uvicorn",
+#     "websockets",
 #     "watchfiles",
 # ]
 # ///
@@ -64,7 +65,7 @@ app.add_middleware(
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     connected_clients.add(websocket)
-    print(f"[Engine] Browser UI connected. Active connections: {len(connected_clients)}")
+    print(f"[Engine] Browser UI connected! Active connections: {len(connected_clients)}")
     
     try:
         # Immediate state synchronization frame
