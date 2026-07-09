@@ -1,35 +1,74 @@
 import * as THREE from 'three';
 
-// --- Sub-systems & Scene Architecture Initialization ---
+// --- Sub-systems & Viewport Initialization ---
 const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a12); // Deep space hue
+
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 4, 10);
-camera.lookAt(0, 0, 0);
+camera.position.set(0, 6, 12);
+camera.lookAt(0, 1, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true; // Enable shadows for greater depth perception
 
-// Guard against duplicating the canvas element during Vite hot-reloads
 const existingCanvas = document.querySelector('canvas');
-if (existingCanvas) {
-    existingCanvas.remove();
-}
+if (existingCanvas) existingCanvas.remove();
 document.body.appendChild(renderer.domElement);
 
-// Generic Environment Lighting
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
-directionalLight.position.set(5, 10, 7);
-scene.add(directionalLight);
+// --- High-Fidelity Lighting Layout ---
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+dirLight.position.set(10, 20, 10);
+dirLight.castShadow = true;
+scene.add(dirLight);
 
-const ambientLight = new THREE.AmbientLight(0x333333);
+const ambientLight = new THREE.AmbientLight(0x22223b, 0.8);
 scene.add(ambientLight);
 
-// --- Live Entity Database Registry ---
+// Add a subtle grid floor helper to visually ground our spatial coordinates
+const gridHelper = new THREE.GridHelper(20, 20, 0x44445c, 0x222233);
+gridHelper.position.y = -0.5;
+scene.add(gridHelper);
+
+// --- Core Repositories & Databases ---
 const entities = new Map();
 const activeIdsInCurrentFrame = new Set();
 
+// --- Primitive Geometry Factory Map ---
+const geometryFactory = {
+    box: () => new THREE.BoxGeometry(1, 1, 1),
+    sphere: () => new THREE.SphereGeometry(0.6, 32, 32),
+    cylinder: () => new THREE.CylinderGeometry(0.5, 0.5, 1.2, 32),
+    torus: () => new THREE.TorusGeometry(0.5, 0.15, 16, 100)
+};
+
+// --- Behavioral Registry Executables ---
+// Tracks procedural transformations applied over time based on spec configurations
+const behaviors = {
+    spin: (mesh, data, time) => {
+        const speed = data.behaviorSpeed || 1.0;
+        mesh.rotation.y += 0.01 * speed;
+    },
+    bounce: (mesh, data, time) => {
+        const speed = data.behaviorSpeed || 2.0;
+        const amplitude = data.behaviorAmplitude || 1.0;
+        const base = data.position.y;
+        mesh.position.y = base + Math.abs(Math.sin(time * speed)) * amplitude;
+        mesh.rotation.y += 0.005;
+    },
+    orbit: (mesh, data, time) => {
+        const speed = data.behaviorSpeed || 1.0;
+        const radius = data.behaviorRadius || 3.0;
+        const centerX = data.position.x;
+        const centerZ = data.position.z;
+        mesh.position.x = centerX + Math.cos(time * speed) * radius;
+        mesh.position.z = centerZ + Math.sin(time * speed) * radius;
+        mesh.rotation.x += 0.01;
+    }
+};
+
 /**
- * Parses and maps a single line from the structural text data stream into Three.js instances.
+ * Parses structural row elements and binds material, shape, and behavior tracks.
  */
 function interpretEntityLine(line) {
     if (!line.trim()) return;
@@ -38,70 +77,77 @@ function interpretEntityLine(line) {
         const data = JSON.parse(line);
         if (data.type !== 'entity') return;
 
-        // Register that this asset is actively present in the specification stream
         activeIdsInCurrentFrame.add(data.id);
 
-        // Targeted Mutation: If the entity exists, mutate properties instead of destroying the mesh
+        let mesh;
+
         if (entities.has(data.id)) {
-            const mesh = entities.get(data.id);
-            mesh.position.set(data.position.x, data.position.y, data.position.z);
-            mesh.scale.set(data.scale.x, data.scale.y, data.scale.z);
-            mesh.material.color.setHex(parseInt(data.color));
-            return;
-        }
-
-        // Factory Instantiation: Build the structural geometry from the spec rules
-        let geometry;
-        if (data.mesh === 'box') {
-            geometry = new THREE.BoxGeometry(1, 1, 1); // Normalized unit dimensions
+            // TARGETED UPDATES: Mutate parameters if geometry matches
+            mesh = entities.get(data.id);
+            
+            // If the mesh type changed, rebuild it; otherwise preserve reference
+            if (mesh.userData.shapeType !== data.mesh) {
+                scene.remove(mesh);
+                mesh.geometry.dispose();
+                mesh.material.dispose();
+                mesh = createNewMesh(data);
+                entities.set(data.id, mesh);
+            } else {
+                mesh.position.set(data.position.x, data.position.y, data.position.z);
+                mesh.scale.set(data.scale.x, data.scale.y, data.scale.z);
+                mesh.material.color.setHex(parseInt(data.color));
+            }
         } else {
-            geometry = new THREE.BoxGeometry(1, 1, 1); 
+            // INITIAL BINDING: Generate clean asset instances
+            mesh = createNewMesh(data);
+            entities.set(data.id, mesh);
         }
 
-        const material = new THREE.MeshStandardMaterial({ 
-            color: parseInt(data.color),
-            roughness: 0.3,
-            metalness: 0.1
-        });
-
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.position.set(data.position.x, data.position.y, data.position.z);
-        mesh.scale.set(data.scale.x, data.scale.y, data.scale.z);
-
-        // Store reference in memory registry and commit to the active scene
-        entities.set(data.id, mesh);
-        scene.add(mesh);
+        // Cache full raw parameters on userData block for runtime behavior lookup
+        mesh.userData.spec = data;
 
     } catch (e) {
-        console.error("[Interpreter] Error parsing structural stream line:", e, "Line context:", line);
+        console.error("[Interpreter Engine Failure]:", e, line);
     }
+}
+
+function createNewMesh(data) {
+    const buildGeo = geometryFactory[data.mesh] || geometryFactory.box;
+    const geometry = buildGeo();
+    
+    const material = new THREE.MeshStandardMaterial({
+        color: parseInt(data.color),
+        roughness: 0.2,
+        metalness: 0.2,
+        wireframe: data.wireframe || false
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(data.position.x, data.position.y, data.position.z);
+    mesh.scale.set(data.scale.x, data.scale.y, data.scale.z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    
+    mesh.userData.shapeType = data.mesh;
+    scene.add(mesh);
+    return mesh;
 }
 
 // --- Dynamic Stream Pipeline Connection ---
 function connectToEcosystemPipeline() {
-    console.log('[Pipeline] Establishing connection to Python server at ws://localhost:8000/ws...');
     const ws = new WebSocket('ws://localhost:8000/ws');
 
-    ws.onopen = () => {
-        console.log('%c[Pipeline] Connected successfully! Data-streaming loop active.', 'color: #00ff00; font-weight: bold;');
-    };
-
     ws.onmessage = (event) => {
-        console.log("[Pipeline] Live specification delta packet intercepted.");
-        
-        // Clear the layout tracking array for the current update pass
         activeIdsInCurrentFrame.clear();
-        
-        // Dissect raw stream segments line-by-line
         const lines = event.data.split('\n');
+        
         for (const line of lines) {
             interpretEntityLine(line);
         }
 
-        // Garbage Collector Frame: Purge objects dropped entirely from the specification file
+        // Garbage Collector Pass
         entities.forEach((mesh, id) => {
             if (!activeIdsInCurrentFrame.has(id)) {
-                console.log(`[Pipeline] Entity '${id}' absent from spec. Deallocating memory...`);
                 scene.remove(mesh);
                 mesh.geometry.dispose();
                 mesh.material.dispose();
@@ -110,15 +156,7 @@ function connectToEcosystemPipeline() {
         });
     };
 
-    ws.onclose = (event) => {
-        console.warn(`[Pipeline] Connection severed (Code: ${event.code}). Retrying lifecycle bind in 2 seconds...`);
-        setTimeout(connectToEcosystemPipeline, 2000);
-    };
-
-    ws.onerror = (err) => {
-        console.error('[Pipeline] Operational connection error:', err);
-        ws.close();
-    };
+    ws.onclose = () => setTimeout(connectToEcosystemPipeline, 2000);
 }
 
 // --- Window Layout Adapters ---
@@ -128,18 +166,23 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// --- Main Loop ---
+// --- System Engine Render Loop ---
+const clock = new THREE.Clock();
+
 function animate() {
     requestAnimationFrame(animate);
-    
-    // Low-overhead baseline procedural rotation to visually prove the animation loop is running
+    const elapsedTime = clock.getElapsedTime();
+
+    // Evaluate active structural behavior components line-by-line
     entities.forEach((mesh) => {
-        mesh.rotation.y += 0.005;
+        const spec = mesh.userData.spec;
+        if (spec && spec.behavior && behaviors[spec.behavior]) {
+            behaviors[spec.behavior](mesh, spec, elapsedTime);
+        }
     });
 
     renderer.render(scene, camera);
 }
 
-// Execute systems
 connectToEcosystemPipeline();
 animate();
